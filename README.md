@@ -1,1 +1,0 @@
-# lms-mail-cron-job

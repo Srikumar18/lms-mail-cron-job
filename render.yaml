@@ -1,0 +1,38 @@
+services:
+  # Web service to keep the app running
+  - type: web
+    name: lms-reminder-service
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn reminder_app:app
+    envVars:
+      - key: SMTP_SERVER
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_EMAIL
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: BASE_URL
+        sync: false
+
+  # Cron job to send reminders daily
+  - type: cron
+    name: daily-reminder-cron
+    runtime: python
+    schedule: "0 9 * * *"  # Every day at 9:00 AM UTC (2:30 PM IST)
+    buildCommand: pip install -r requirements.txt
+    startCommand: curl -X POST https://lms-reminder-service.onrender.com/send-reminders
+    envVars:
+      - key: SMTP_SERVER
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_EMAIL
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: BASE_URL
+        sync: false
