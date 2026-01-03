@@ -1,0 +1,16 @@
+name: LMS Mail Reminder Cron
+
+on:
+  schedule:
+    - cron: "30 * * * *"   # every hour (UTC)
+  workflow_dispatch:
+
+jobs:
+  call-api:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call LMS reminder API (POST)
+        run: |
+          echo "Calling LMS reminder API via POST..."
+          curl -X POST https://lms-mail-reminder.onrender.com/send-reminders
