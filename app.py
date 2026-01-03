@@ -1,5 +1,5 @@
 import os
-import smtplib
+import base64
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -7,6 +7,8 @@ from flask import Flask, jsonify
 import firebase_admin
 from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import FieldFilter
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 
 app = Flask(__name__)
 
@@ -15,31 +17,53 @@ cred = credentials.Certificate("firebase-service-account.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# Email Configuration
-SMTP_SERVER = os.getenv("SMTP_SERVER")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_EMAIL = os.getenv("SMTP_EMAIL")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-BASE_URL = os.getenv("BASE_URL", "https://your-render-service.onrender.com")
+# At the top, replace SMTP config:
+GMAIL_REFRESH_TOKEN = os.getenv("GMAIL_REFRESH_TOKEN")
+GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID")
+GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET")
+FROM_EMAIL = "noreply.ssnlms@gmail.com"
+BASE_URL = os.getenv("BASE_URL")
+
+def get_gmail_service():
+    """Create Gmail API service with refresh token"""
+    creds = Credentials(
+        token=None,
+        refresh_token=GMAIL_REFRESH_TOKEN,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=GMAIL_CLIENT_ID,
+        client_secret=GMAIL_CLIENT_SECRET,
+        scopes=['https://www.googleapis.com/auth/gmail.send']
+    )
+    return build('gmail', 'v1', credentials=creds)
 
 def send_email(to_email, subject, html_body, text_body):
-    """Send email via SMTP"""
+    """Send email via Gmail API"""
     try:
-        msg = MIMEMultipart("alternative")
-        msg["From"] = f"LMS Helper <{SMTP_EMAIL}>"
-        msg["To"] = to_email
-        msg["Subject"] = subject
-        msg.attach(MIMEText(text_body, "plain"))
-        msg.attach(MIMEText(html_body, "html"))
+        service = get_gmail_service()
         
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_EMAIL, SMTP_PASSWORD)
-            server.sendmail(SMTP_EMAIL, to_email, msg.as_string())
+        # Create message
+        message = MIMEMultipart('alternative')
+        message['From'] = FROM_EMAIL
+        message['To'] = to_email
+        message['Subject'] = subject
         
+        message.attach(MIMEText(text_body, 'plain'))
+        message.attach(MIMEText(html_body, 'html'))
+        
+        # Encode and send
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+        send_message = {'raw': raw_message}
+        
+        service.users().messages().send(
+            userId='me', 
+            body=send_message
+        ).execute()
+        
+        print(f"✅ Email sent to {to_email} via Gmail API")
         return True
+        
     except Exception as e:
-        print(f"❌ Email send error: {e}")
+        print(f"❌ Gmail API error: {e}")
         return False
 
 def create_assignment_email_html(user_name: str, assignments: list, unsubscribe_token: str) -> str:
