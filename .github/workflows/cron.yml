@@ -2,7 +2,7 @@ name: LMS Mail Reminder Cron
 
 on:
   schedule:
-    - cron: "30 * * * *"   # every hour (UTC)
+    - cron: "0 0 */2 * *" 
   workflow_dispatch:
 
 jobs:
